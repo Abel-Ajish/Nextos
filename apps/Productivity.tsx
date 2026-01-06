@@ -243,7 +243,8 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
       { id: 'general', label: 'General', icon: 'settings' },
       { id: 'personalization', label: 'Personalization', icon: 'edit' },
       { id: 'display', label: 'Display', icon: 'media' },
-      { id: 'system', label: 'System', icon: 'sysinfo' },
+      { id: 'system', label: 'System', icon: 'activity' },
+      { id: 'about', label: 'About', icon: 'sysinfo' },
   ];
 
   return (
@@ -403,7 +404,7 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
         {activeTab === 'system' && (
             <div className="space-y-6">
                  <section className="bg-surfaceVariant/30 p-4 rounded-2xl">
-                    <h2 className="font-bold mb-4">About</h2>
+                    <h2 className="font-bold mb-4">System Status</h2>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
                             <div className="text-xs opacity-50 mb-1">CPU Load</div>
@@ -420,11 +421,6 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
                             <div className="text-right text-xs mt-1">{stats.ram}%</div>
                         </div>
                     </div>
-                    <div className="space-y-1 text-xs font-mono opacity-70 border-t border-black/5 pt-3">
-                        <div className="flex justify-between"><span>Version</span> <span>NextOS Local v1.4</span></div>
-                        <div className="flex justify-between"><span>Kernel</span> <span>React-18-Fiber</span></div>
-                        <div className="flex justify-between"><span>Resolution</span> <span>{window.innerWidth}x{window.innerHeight}</span></div>
-                    </div>
                 </section>
 
                 <section className="bg-surfaceVariant/30 p-4 rounded-2xl border border-red-500/20">
@@ -437,6 +433,50 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
                         Factory Reset
                     </button>
                 </section>
+            </div>
+        )}
+
+        {activeTab === 'about' && (
+            <div className="space-y-6">
+                 <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
+                     <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center text-onPrimary shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500">
+                         <Icon name="spark" size={48} />
+                     </div>
+                     <div>
+                         <h1 className="text-3xl font-light tracking-tight">NextOS</h1>
+                         <p className="opacity-50 text-sm">Web-based Operating System</p>
+                     </div>
+                 </div>
+
+                 <section className="bg-surfaceVariant/30 p-4 rounded-2xl">
+                    <h2 className="text-sm font-bold opacity-50 uppercase mb-3">Device Specifications</h2>
+                    <div className="space-y-3 text-sm">
+                        <div className="flex justify-between border-b border-black/5 pb-2">
+                            <span className="opacity-70">Version</span>
+                            <span className="font-mono">2.0.0 (Stable)</span>
+                        </div>
+                        <div className="flex justify-between border-b border-black/5 pb-2">
+                            <span className="opacity-70">Build ID</span>
+                            <span className="font-mono">2024.NEXT.05</span>
+                        </div>
+                         <div className="flex justify-between border-b border-black/5 pb-2">
+                            <span className="opacity-70">Kernel</span>
+                            <span className="font-mono">React-Fiber-18</span>
+                        </div>
+                        <div className="flex justify-between border-b border-black/5 pb-2">
+                            <span className="opacity-70">Resolution</span>
+                            <span className="font-mono">{window.innerWidth} x {window.innerHeight}</span>
+                        </div>
+                         <div className="flex justify-between">
+                            <span className="opacity-70">User Agent</span>
+                            <span className="font-mono truncate max-w-[200px] text-xs">{navigator.userAgent}</span>
+                        </div>
+                    </div>
+                 </section>
+
+                 <div className="text-center text-xs opacity-40 pt-4">
+                     &copy; 2024 NextOS Project. All rights reserved.
+                 </div>
             </div>
         )}
 
