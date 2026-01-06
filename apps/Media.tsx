@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { AppProps, FileSystemItem } from '../types';
-import { listFiles, getFile, saveFile, generateId } from '../services/system.ts';
+import { listFiles, getFile, saveFile, generateId } from '../services/system';
 import { Icon } from '../components/SystemUI';
 
 // --- Calculator ---

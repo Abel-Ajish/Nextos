@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { AppProps, WindowState } from '../types';
-import { saveFile, getFile, generateId } from '../services/system.ts';
+import { saveFile, getFile, generateId } from '../services/system';
 import { Icon } from '../components/SystemUI';
 
 // --- Text Editor (DevTools) ---

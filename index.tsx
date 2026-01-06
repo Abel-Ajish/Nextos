@@ -2,7 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { checkAndPerformReset } from './services/system.ts';
+import { checkAndPerformReset } from './services/system';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AppProps } from '../types';
 import { Icon } from '../components/SystemUI';
-import { saveFile, generateId } from '../services/system.ts';
+import { saveFile, generateId } from '../services/system';
 
 export const PaintApp: React.FC<AppProps> = ({ showNotification }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);

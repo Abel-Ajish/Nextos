@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppDefinition, AppType, WindowState, ContextMenuState, NotificationItem } from './types';
 import { Icon, Taskbar, StartMenu, Window, ContextMenu, DesktopClock, DesktopCalendar, BootScreen, ToastNotification, LockScreen } from './components/SystemUI';
-import { applyTheme, loadSettings, getFile } from './services/system.ts';
+import { applyTheme, loadSettings, getFile } from './services/system';
 
 // Apps
 import { FileExplorer, Settings, Terminal, Notes, Browser, SpaceApp } from './apps/Productivity';

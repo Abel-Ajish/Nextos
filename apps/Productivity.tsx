@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { AppProps, FileSystemItem, SystemSettings, ContextMenuState, AppType } from '../types';
-import { listFiles, saveFile, deleteFile, loadSettings, saveSettings, formatSize, generateId, getFile, triggerSystemReset } from '../services/system.ts';
+import { listFiles, saveFile, deleteFile, loadSettings, saveSettings, formatSize, generateId, getFile, triggerSystemReset } from '../services/system';
 import { Icon, ContextMenu } from '../components/SystemUI';
 import { GoogleGenAI } from "@google/genai";
 
