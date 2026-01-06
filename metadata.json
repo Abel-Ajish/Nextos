@@ -1,0 +1,8 @@
+{
+  "name": "WebOS Local",
+  "description": "A fully offline, browser-based operating system with Material You design, virtual file system, and window management.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
