@@ -476,7 +476,7 @@ export const BootScreen: React.FC<{ onComplete: () => void }> = ({ onComplete })
             <div className="w-24 h-24 bg-primary rounded-full mb-8 animate-pulse flex items-center justify-center">
                  <svg viewBox="0 0 24 24" fill="white" width="64" height="64"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" /></svg>
             </div>
-            <h1 className="text-3xl font-light mb-8 tracking-widest">WebOS <span className="font-bold">Local</span></h1>
+            <h1 className="text-3xl font-light mb-8 tracking-widest">NextOS <span className="font-bold">Local</span></h1>
             
             <div className="w-64 h-1 bg-gray-800 rounded-full overflow-hidden mb-2">
                 <div 

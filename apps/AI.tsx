@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { AppProps } from '../types';
 import { Icon } from '../components/SystemUI';
@@ -8,7 +9,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const GeminiAssistant: React.FC<AppProps> = () => {
     const [messages, setMessages] = useState<{ role: 'user' | 'model', text: string }[]>([
-        { role: 'model', text: 'Hi! I am your WebOS Assistant powered by Gemini. How can I help you today?' }
+        { role: 'model', text: 'Hi! I am your NextOS Assistant powered by Gemini. How can I help you today?' }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);

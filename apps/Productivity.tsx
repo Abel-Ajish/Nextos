@@ -421,7 +421,7 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
                         </div>
                     </div>
                     <div className="space-y-1 text-xs font-mono opacity-70 border-t border-black/5 pt-3">
-                        <div className="flex justify-between"><span>Version</span> <span>WebOS Local v1.4</span></div>
+                        <div className="flex justify-between"><span>Version</span> <span>NextOS Local v1.4</span></div>
                         <div className="flex justify-between"><span>Kernel</span> <span>React-18-Fiber</span></div>
                         <div className="flex justify-between"><span>Resolution</span> <span>{window.innerWidth}x{window.innerHeight}</span></div>
                     </div>
@@ -448,7 +448,7 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
 
 // --- Terminal ---
 export const Terminal: React.FC<AppProps> = () => {
-  const [history, setHistory] = useState<string[]>(['Welcome to WebOS Terminal v1.0', 'Type "help" for commands.']);
+  const [history, setHistory] = useState<string[]>(['Welcome to NextOS Terminal v1.0', 'Type "help" for commands.']);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
