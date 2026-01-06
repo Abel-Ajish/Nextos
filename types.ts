@@ -84,6 +84,7 @@ export interface SystemSettings {
   clockFormat: '12h' | '24h';
   fontSize: 'small' | 'medium' | 'large';
   animations: boolean;
+  profilePicture: string | null;
 }
 
 export interface ContextMenuState {

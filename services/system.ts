@@ -191,6 +191,7 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   clockFormat: '24h',
   fontSize: 'medium',
   animations: true,
+  profilePicture: null
 };
 
 export const loadSettings = (): SystemSettings => {
