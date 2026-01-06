@@ -28,7 +28,7 @@ export const Icon: React.FC<{ name: string; className?: string; size?: number }>
     'refresh': 'M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z',
     'spark': 'M12 2L9.19 8.63 2.56 11.44 9.19 14.25 12 20.88 14.81 14.25 21.44 11.44 14.81 8.63z',
     'edit': 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
-    'save': 'M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z',
+    'save': 'M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 1.34 3 3-1.34 3 3-3 3zm3-10H5V5h10v4z',
     'check': 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
     'cancel': 'M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z',
     'crop': 'M17 15h2V7c0-1.1-.9-2-2-2H9v2h8v8zM7 17V1H5v4H1v2h4v10c0 1.1.9 2 2 2h10v4h2v-4h4v-2H7z',
@@ -44,7 +44,9 @@ export const Icon: React.FC<{ name: string; className?: string; size?: number }>
     'pause': 'M6 19h4V5H6v14zm8-14v14h4V5h-4z',
     'stop': 'M6 6h12v12H6z',
     'power': 'M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z',
-    'grid': 'M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z'
+    'grid': 'M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z',
+    'chevron-left': 'M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z',
+    'chevron-right': 'M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z'
   };
 
   return (
@@ -228,7 +230,8 @@ export const Taskbar: React.FC<{
   onToggleStart: () => void;
   isStartOpen: boolean;
   onLock: () => void;
-}> = ({ apps, runningApps, onLaunch, onToggleStart, isStartOpen, onLock }) => {
+  onToggleCalendar: () => void;
+}> = ({ apps, runningApps, onLaunch, onToggleStart, isStartOpen, onLock, onToggleCalendar }) => {
   const [time, setTime] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -264,17 +267,119 @@ export const Taskbar: React.FC<{
          })}
       </div>
 
-      <div className="flex items-center gap-4 px-2 text-xs font-medium opacity-80 cursor-default select-none">
-          <button onClick={onLock} className="hover:bg-white/10 p-1 rounded active:scale-90 transition-transform" title="Lock Screen">
-            <Icon name="lock" size={16} />
+      <div className="flex items-center gap-2">
+          <button onClick={onLock} className="hover:bg-white/10 p-2 rounded active:scale-90 transition-transform opacity-70 hover:opacity-100" title="Lock Screen">
+            <Icon name="lock" size={18} />
           </button>
-          <div className="flex flex-col items-end leading-tight">
-              <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <div 
+              onClick={onToggleCalendar}
+              className="flex flex-col items-end leading-tight px-3 py-1 rounded hover:bg-white/10 cursor-pointer active:bg-white/20 transition-colors select-none"
+          >
+              <span className="font-medium text-xs">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
               <span className="text-[10px] opacity-70">{time.toLocaleDateString()}</span>
           </div>
       </div>
     </div>
   );
+};
+
+// --- Calendar Widget ---
+export const CalendarWidget: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const ref = useRef<HTMLDivElement>(null);
+    
+    // Close on click outside
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+             if(ref.current && !ref.current.contains(e.target as Node)) onClose();
+        };
+        if(isOpen) setTimeout(() => document.addEventListener('click', handleClick), 100);
+        return () => document.removeEventListener('click', handleClick);
+    }, [isOpen, onClose]);
+
+    // Reset to today when opening
+    useEffect(() => {
+        if(isOpen) setCurrentDate(new Date());
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay(); // 0 = Sunday
+    
+    // Previous month days to fill
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    
+    // Generate grid
+    const days = [];
+    // Prev month padding
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+        days.push({ day: prevMonthLastDay - i, type: 'prev' });
+    }
+    // Current month
+    for (let i = 1; i <= daysInMonth; i++) {
+        days.push({ day: i, type: 'current' });
+    }
+    // Next month padding
+    const remaining = 42 - days.length; // 6 rows * 7 cols
+    for (let i = 1; i <= remaining; i++) {
+        days.push({ day: i, type: 'next' });
+    }
+
+    const changeMonth = (delta: number) => {
+        setCurrentDate(new Date(year, month + delta, 1));
+    };
+
+    const isToday = (d: number, type: string) => {
+        if (type !== 'current') return false;
+        const now = new Date();
+        return now.getDate() === d && now.getMonth() === month && now.getFullYear() === year;
+    };
+
+    return (
+        <div ref={ref} className="fixed bottom-14 right-2 w-80 bg-surfaceVariant/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 p-4 z-[1001] animate-[pop-up-start_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards] origin-bottom-right select-none text-onSurface">
+             {/* Header */}
+             <div className="flex justify-between items-center mb-4">
+                 <div className="font-bold text-lg">
+                    {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                 </div>
+                 <div className="flex gap-1">
+                     <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-white/10 rounded-full active:scale-90 transition-transform"><Icon name="chevron-left" size={20} /></button>
+                     <button onClick={() => changeMonth(1)} className="p-1 hover:bg-white/10 rounded-full active:scale-90 transition-transform"><Icon name="chevron-right" size={20} /></button>
+                 </div>
+             </div>
+
+             {/* Days Header */}
+             <div className="grid grid-cols-7 text-center text-xs opacity-50 mb-2 font-medium">
+                 {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => <div key={d}>{d}</div>)}
+             </div>
+
+             {/* Grid */}
+             <div className="grid grid-cols-7 gap-1 text-sm">
+                 {days.map((d, i) => (
+                     <div 
+                        key={i} 
+                        className={`h-9 w-9 flex items-center justify-center rounded-full transition-colors cursor-default
+                            ${d.type === 'current' ? 'text-onSurface' : 'text-onSurface/30'}
+                            ${isToday(d.day, d.type) ? 'bg-primary text-onPrimary font-bold shadow-md' : d.type === 'current' ? 'hover:bg-white/10' : ''}
+                        `}
+                     >
+                         {d.day}
+                     </div>
+                 ))}
+             </div>
+             
+             {/* Show current full date at bottom */}
+             <div className="mt-4 pt-3 border-t border-white/10 text-center text-xs opacity-50">
+                 {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+             </div>
+        </div>
+    );
 };
 
 // --- Start Menu ---

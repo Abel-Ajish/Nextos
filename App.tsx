@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppDefinition, AppType, WindowState, ContextMenuState, NotificationItem } from './types';
-import { Icon, Taskbar, StartMenu, Window, ContextMenu, DesktopClock, DesktopCalendar, BootScreen, ToastNotification, LockScreen } from './components/SystemUI';
+import { Icon, Taskbar, StartMenu, Window, ContextMenu, DesktopClock, DesktopCalendar, BootScreen, ToastNotification, LockScreen, CalendarWidget } from './components/SystemUI';
 import { applyTheme, loadSettings, getFile } from './services/system';
 
 // Apps
@@ -52,6 +52,7 @@ const App: React.FC = () => {
   const [windows, setWindows] = useState<WindowState[]>([]);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
   const [startOpen, setStartOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [nextZIndex, setNextZIndex] = useState(10);
   const [wallpaperUrl, setWallpaperUrl] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ isOpen: false, x: 0, y: 0, items: [] });
@@ -125,6 +126,7 @@ const App: React.FC = () => {
     setNextZIndex(prev => prev + 1);
     setActiveWindowId(id);
     setStartOpen(false);
+    setCalendarOpen(false);
   }, [nextZIndex, windows.length]);
 
   const closeWindow = (id: string) => {
@@ -153,6 +155,7 @@ const App: React.FC = () => {
   const handleDesktopClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
         setStartOpen(false);
+        setCalendarOpen(false);
         setActiveWindowId(null);
     }
   };
@@ -167,7 +170,7 @@ const App: React.FC = () => {
               { label: 'Refresh Wallpaper', action: loadWallpaper },
               { label: 'Settings', action: () => launchApp(AppType.Settings) },
               { label: 'New Text File', action: () => launchApp(AppType.Notes) },
-              { label: 'Lock Screen', action: () => { setLocked(true); setStartOpen(false); } }
+              { label: 'Lock Screen', action: () => { setLocked(true); setStartOpen(false); setCalendarOpen(false); } }
           ]
       });
   };
@@ -218,6 +221,7 @@ const App: React.FC = () => {
       setBooting(false);
       setLocked(true); // Default to locked after boot for realism
       setStartOpen(false);
+      setCalendarOpen(false);
   };
 
   return (
@@ -299,6 +303,11 @@ const App: React.FC = () => {
         onClose={() => setStartOpen(false)}
         onAppContextMenu={handleStartMenuIconContext}
       />
+      
+      <CalendarWidget 
+        isOpen={calendarOpen}
+        onClose={() => setCalendarOpen(false)}
+      />
 
       {/* Taskbar Container with Slide Animation */}
       <div className={`fixed bottom-0 left-0 right-0 z-[1000] transition-transform duration-500 ${locked ? 'translate-y-full' : 'translate-y-0'}`}>
@@ -315,10 +324,15 @@ const App: React.FC = () => {
                 }
             }}
             onToggleStart={() => {
-                setStartOpen(!startOpen); 
+                setStartOpen(!startOpen);
+                setCalendarOpen(false);
             }}
             isStartOpen={startOpen}
-            onLock={() => { setLocked(true); setStartOpen(false); }}
+            onLock={() => { setLocked(true); setStartOpen(false); setCalendarOpen(false); }}
+            onToggleCalendar={() => {
+                setCalendarOpen(!calendarOpen);
+                setStartOpen(false);
+            }}
         />
       </div>
 
