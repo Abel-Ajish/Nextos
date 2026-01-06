@@ -445,6 +445,13 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
                      <div>
                          <h1 className="text-3xl font-light tracking-tight">NextOS</h1>
                          <p className="opacity-50 text-sm">Web-based Operating System</p>
+                         <div className="mt-4 flex flex-col gap-1">
+                            <p className="text-sm font-medium text-primary">Created by Abel Ajish</p>
+                            <div className="flex items-center justify-center gap-1.5 text-xs opacity-70">
+                                <Icon name="spark" size={12} />
+                                <span>Vibe coded using Gemini</span>
+                            </div>
+                         </div>
                      </div>
                  </div>
 
@@ -453,15 +460,15 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
                     <div className="space-y-3 text-sm">
                         <div className="flex justify-between border-b border-black/5 pb-2">
                             <span className="opacity-70">Version</span>
-                            <span className="font-mono">2.0.0 (Stable)</span>
+                            <span className="font-mono">3.0.0 (Alpha)</span>
                         </div>
                         <div className="flex justify-between border-b border-black/5 pb-2">
                             <span className="opacity-70">Build ID</span>
-                            <span className="font-mono">2024.NEXT.05</span>
+                            <span className="font-mono">2026.NEXT.01</span>
                         </div>
                          <div className="flex justify-between border-b border-black/5 pb-2">
                             <span className="opacity-70">Kernel</span>
-                            <span className="font-mono">React-Fiber-18</span>
+                            <span className="font-mono">React-Fiber-19</span>
                         </div>
                         <div className="flex justify-between border-b border-black/5 pb-2">
                             <span className="opacity-70">Resolution</span>
@@ -475,7 +482,7 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
                  </section>
 
                  <div className="text-center text-xs opacity-40 pt-4">
-                     &copy; 2024 NextOS Project. All rights reserved.
+                     &copy; 2026 NextOS Project. Created by Abel Ajish.
                  </div>
             </div>
         )}
