@@ -11,6 +11,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 // --- File Explorer ---
 export const FileExplorer: React.FC<AppProps> = ({ onLaunchApp, showNotification }) => {
   const [currentPath, setCurrentPath] = useState<string | null>(null);
+  const [history, setHistory] = useState<(string | null)[]>([null]);
+  const [historyIndex, setHistoryIndex] = useState(0);
   const [files, setFiles] = useState<FileSystemItem[]>([]);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ isOpen: false, x: 0, y: 0, items: [] });
@@ -20,6 +22,39 @@ export const FileExplorer: React.FC<AppProps> = ({ onLaunchApp, showNotification
   const refresh = () => listFiles(currentPath).then(setFiles);
 
   useEffect(() => { refresh(); }, [currentPath]);
+
+  const navigate = (path: string | null) => {
+      if (path === currentPath) return;
+      
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(path);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+      setCurrentPath(path);
+  };
+
+  const goBack = () => {
+      if (historyIndex > 0) {
+          const newIndex = historyIndex - 1;
+          setHistoryIndex(newIndex);
+          setCurrentPath(history[newIndex]);
+      }
+  };
+
+  const goForward = () => {
+      if (historyIndex < history.length - 1) {
+          const newIndex = historyIndex + 1;
+          setHistoryIndex(newIndex);
+          setCurrentPath(history[newIndex]);
+      }
+  };
+
+  const goUp = async () => {
+      if (currentPath) {
+          const currentFile = await getFile(currentPath);
+          navigate(currentFile && currentFile.parentId !== 'root' ? currentFile.parentId : null);
+      }
+  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -72,7 +107,7 @@ export const FileExplorer: React.FC<AppProps> = ({ onLaunchApp, showNotification
 
   const handleOpen = (file: FileSystemItem) => {
     if (file.type === 'folder') {
-        setCurrentPath(file.id);
+        navigate(file.id);
     } else if (file.mimeType?.startsWith('image/')) {
         onLaunchApp(AppType.PhotoViewer, { fileId: file.id });
     } else if (file.mimeType?.startsWith('audio/') || file.mimeType?.startsWith('video/')) {
@@ -91,29 +126,26 @@ export const FileExplorer: React.FC<AppProps> = ({ onLaunchApp, showNotification
       e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent, target: FileSystemItem | 'home') => {
+  const handleDragOver = (e: React.DragEvent, targetId: string | null) => {
       e.preventDefault();
-      // Can't drop on self or if dragging a folder into itself (simple check: if drag target is not null)
-      if (!draggedFile) return;
-      if (typeof target !== 'string' && draggedFile.id === target.id) return;
+      // Prevent dropping on itself or if no dragged file
+      if (!draggedFile || draggedFile.id === targetId) return;
       
       e.dataTransfer.dropEffect = 'move';
-      setDragOverTarget(typeof target === 'string' ? 'home' : target.id);
+      setDragOverTarget(targetId);
   };
 
   const handleDragLeave = () => {
+      setDragOverTarget(undefined as any); // hack to clear state properly
       setDragOverTarget(null);
   };
 
-  const handleDrop = async (e: React.DragEvent, target: FileSystemItem | 'home') => {
+  const handleDrop = async (e: React.DragEvent, targetId: string | null) => {
       e.preventDefault();
       setDragOverTarget(null);
       if (!draggedFile) return;
 
-      const targetId = target === 'home' ? null : target.id;
-      
-      // Basic cycle detection (prevent dropping folder into its own subfolder) not implemented for simplicity, 
-      // but preventing drop into self is handled.
+      // Basic cycle detection logic
       if (draggedFile.id === targetId) return;
 
       try {
@@ -127,56 +159,182 @@ export const FileExplorer: React.FC<AppProps> = ({ onLaunchApp, showNotification
       }
   };
 
+  // Helper for File Icons
+  const getFileIcon = (file: FileSystemItem) => {
+      if (file.type === 'folder') return { icon: 'folder', color: 'text-yellow-400' };
+      if (file.mimeType?.startsWith('image/')) return { icon: 'image', color: 'text-purple-500' };
+      if (file.mimeType?.startsWith('video/')) return { icon: 'video', color: 'text-red-500' };
+      if (file.mimeType?.startsWith('audio/')) return { icon: 'music', color: 'text-pink-500' };
+      if (file.mimeType?.startsWith('text/') || file.name.includes('json') || file.name.includes('js')) return { icon: 'file-text', color: 'text-blue-400' };
+      return { icon: 'files', color: 'text-gray-500' };
+  };
+  
   return (
-    <div className="h-full flex flex-col bg-surface" onClick={() => setContextMenu({ ...contextMenu, isOpen: false })}>
-      <div className="p-2 border-b border-black/5 flex gap-2 items-center">
-        <button 
-            onClick={() => setCurrentPath(null)} 
-            disabled={!currentPath} 
-            className={`p-1 hover:bg-black/5 rounded disabled:opacity-30 flex items-center gap-1 ${dragOverTarget === 'home' ? 'bg-primary/20 ring-2 ring-primary' : ''}`}
-            onDragOver={(e) => handleDragOver(e, 'home')}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, 'home')}
-        >
-            <Icon name="home" size={16} />
-            <span className="font-bold">Home</span>
-        </button>
-        <span className="opacity-50">/</span>
-        <span className="text-sm">{currentPath ? 'Subfolder' : 'Root'}</span>
-        <div className="flex-1"></div>
-        <button onClick={refresh} className="p-1 hover:bg-black/5 rounded-full"><Icon name="refresh" size={18} /></button>
-        <label className="p-1 px-3 bg-primary text-onPrimary rounded-full text-xs cursor-pointer hover:shadow-md">
-           Upload
-           <input type="file" multiple className="hidden" onChange={handleUpload} />
-        </label>
-        <button onClick={createFolder} className="p-1 px-3 bg-secondary/10 hover:bg-secondary/20 rounded-full text-xs">New Folder</button>
+    <div className="h-full flex bg-surface text-onSurface" onClick={() => setContextMenu({ ...contextMenu, isOpen: false })}>
+      
+      {/* Sidebar - Quick Access */}
+      <div className="w-48 bg-surfaceVariant/20 border-r border-black/10 flex flex-col p-2 shrink-0">
+          <div className="text-xs font-bold opacity-50 px-2 py-2 uppercase">Quick Access</div>
+          <button 
+             onClick={() => navigate(null)}
+             onDragOver={(e) => handleDragOver(e, null)}
+             onDragLeave={handleDragLeave}
+             onDrop={(e) => handleDrop(e, null)}
+             className={`flex items-center gap-2 p-2 rounded-lg text-sm transition-colors text-left
+                 ${currentPath === null ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-black/5'}
+                 ${dragOverTarget === null ? 'ring-2 ring-primary bg-primary/20' : ''}
+             `}
+          >
+              <Icon name="home" size={18} className="text-blue-500" />
+              <span>Home</span>
+          </button>
+          {/* Visual placeholders for other common locations */}
+          <button className="flex items-center gap-2 p-2 rounded-lg text-sm hover:bg-black/5 opacity-50 cursor-not-allowed text-left">
+              <Icon name="clock" size={18} />
+              <span>Recent</span>
+          </button>
+          <button className="flex items-center gap-2 p-2 rounded-lg text-sm hover:bg-black/5 opacity-50 cursor-not-allowed text-left">
+              <Icon name="stop" size={18} />
+              <span>Trash</span>
+          </button>
       </div>
-      <div className="flex-1 overflow-auto p-4">
-        {files.length === 0 && <div className="text-center opacity-50 mt-10">Folder is empty</div>}
-        <div className={`grid ${view === 'grid' ? 'grid-cols-4 sm:grid-cols-6' : 'grid-cols-1'} gap-4`}>
-          {files.map(file => (
-            <div 
-              key={file.id} 
-              className={`group flex flex-col items-center gap-2 p-2 rounded-xl cursor-pointer relative transition-all
-                  ${dragOverTarget === file.id ? 'bg-primary/20 scale-105 ring-2 ring-primary' : 'hover:bg-black/5'}
-                  ${draggedFile?.id === file.id ? 'opacity-50' : ''}
-              `}
-              onDoubleClick={() => handleOpen(file)}
-              onContextMenu={(e) => handleContextMenu(e, file)}
-              draggable
-              onDragStart={(e) => handleDragStart(e, file)}
-              onDragOver={(e) => file.type === 'folder' ? handleDragOver(e, file) : undefined}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => file.type === 'folder' ? handleDrop(e, file) : undefined}
-            >
-              <div className="w-12 h-12 flex items-center justify-center text-secondary pointer-events-none">
-                 <Icon name={file.type === 'folder' ? 'files' : 'notes'} size={32} className={file.type === 'folder' ? 'text-yellow-600' : 'text-blue-500'} />
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+          
+          {/* Toolbar */}
+          <div className="h-12 border-b border-black/10 flex items-center px-4 gap-2 shrink-0">
+              <div className="flex items-center gap-1">
+                  <button onClick={goBack} disabled={historyIndex === 0} className="p-1.5 hover:bg-black/5 rounded-full disabled:opacity-30">
+                      <Icon name="arrow-left" size={18} />
+                  </button>
+                  <button onClick={goForward} disabled={historyIndex === history.length - 1} className="p-1.5 hover:bg-black/5 rounded-full disabled:opacity-30">
+                      <Icon name="arrow-right" size={18} />
+                  </button>
+                  <button onClick={goUp} disabled={!currentPath} className="p-1.5 hover:bg-black/5 rounded-full disabled:opacity-30">
+                      <Icon name="chevron-left" size={18} className="rotate-90" />
+                  </button>
               </div>
-              <span className="text-xs text-center truncate w-full px-1 pointer-events-none">{file.name}</span>
-            </div>
-          ))}
-        </div>
+
+              {/* Breadcrumb Bar */}
+              <div className="flex-1 mx-2 h-8 bg-black/5 rounded-md flex items-center px-3 text-sm overflow-hidden whitespace-nowrap border border-transparent focus-within:border-primary/50 transition-colors">
+                  <Icon name="folder" size={14} className="mr-2 opacity-50" />
+                  <span className="opacity-70">Home</span>
+                  {currentPath && <span className="mx-1 opacity-40">/</span>}
+                  {currentPath && <span className="font-medium truncate">{files.find(f => f.id === currentPath)?.name || currentPath.substring(0,8)}</span>}
+              </div>
+
+              <div className="flex items-center gap-1 border-l border-black/10 pl-2">
+                   <button onClick={() => setView('grid')} className={`p-1.5 rounded ${view === 'grid' ? 'bg-black/10' : 'hover:bg-black/5'}`}>
+                       <Icon name="grid" size={18} />
+                   </button>
+                   <button onClick={() => setView('list')} className={`p-1.5 rounded ${view === 'list' ? 'bg-black/10' : 'hover:bg-black/5'}`}>
+                       <Icon name="list" size={18} />
+                   </button>
+              </div>
+
+              <div className="flex items-center gap-2 border-l border-black/10 pl-2">
+                 <label className="p-1.5 hover:bg-black/10 rounded cursor-pointer text-primary" title="Upload">
+                     <Icon name="rocket" size={18} />
+                     <input type="file" multiple className="hidden" onChange={handleUpload} />
+                 </label>
+                 <button onClick={createFolder} className="p-1.5 hover:bg-black/10 rounded text-yellow-600" title="New Folder">
+                     <Icon name="folder" size={18} />
+                 </button>
+                 <button onClick={refresh} className="p-1.5 hover:bg-black/10 rounded" title="Refresh">
+                     <Icon name="refresh" size={18} />
+                 </button>
+              </div>
+          </div>
+
+          {/* File View Area */}
+          <div 
+            className="flex-1 overflow-auto p-4"
+            onDragOver={(e) => currentPath ? undefined : handleDragOver(e, null)} // Allow dropping in empty space of Home
+            onDrop={(e) => currentPath ? undefined : handleDrop(e, null)}
+          >
+              {files.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full opacity-30 select-none">
+                      <Icon name="folder" size={64} />
+                      <span className="mt-2 text-sm">This folder is empty</span>
+                  </div>
+              )}
+
+              {view === 'grid' ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                      {files.map(file => {
+                          const visual = getFileIcon(file);
+                          return (
+                            <div 
+                                key={file.id} 
+                                className={`group flex flex-col items-center p-3 rounded-xl cursor-pointer transition-all border border-transparent
+                                    ${dragOverTarget === file.id ? 'bg-primary/20 border-primary scale-105 shadow-lg z-10' : 'hover:bg-black/5 hover:border-black/5'}
+                                    ${draggedFile?.id === file.id ? 'opacity-40' : ''}
+                                `}
+                                onDoubleClick={() => handleOpen(file)}
+                                onContextMenu={(e) => handleContextMenu(e, file)}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, file)}
+                                onDragOver={(e) => file.type === 'folder' ? handleDragOver(e, file.id) : undefined}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => file.type === 'folder' ? handleDrop(e, file.id) : undefined}
+                            >
+                                <div className={`w-14 h-14 flex items-center justify-center mb-2 transition-transform group-hover:scale-110 ${visual.color}`}>
+                                    <Icon name={visual.icon} size={48} />
+                                </div>
+                                <span className="text-xs text-center truncate w-full px-1 select-none font-medium leading-tight">{file.name}</span>
+                                <span className="text-[10px] opacity-40 mt-0.5">{file.type === 'folder' ? 'Folder' : formatSize(file.size)}</span>
+                            </div>
+                          );
+                      })}
+                  </div>
+              ) : (
+                  <div className="flex flex-col select-none">
+                      <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-bold opacity-50 border-b border-black/5 uppercase tracking-wider">
+                          <div className="col-span-6">Name</div>
+                          <div className="col-span-2">Type</div>
+                          <div className="col-span-2">Size</div>
+                          <div className="col-span-2">Date</div>
+                      </div>
+                      {files.map(file => {
+                          const visual = getFileIcon(file);
+                          return (
+                             <div 
+                                key={file.id}
+                                className={`grid grid-cols-12 gap-4 px-4 py-2 items-center text-sm border-b border-black/5 cursor-pointer transition-colors
+                                    ${dragOverTarget === file.id ? 'bg-primary/20 ring-1 ring-primary z-10' : 'hover:bg-black/5'}
+                                    ${draggedFile?.id === file.id ? 'opacity-40' : ''}
+                                `}
+                                onDoubleClick={() => handleOpen(file)}
+                                onContextMenu={(e) => handleContextMenu(e, file)}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, file)}
+                                onDragOver={(e) => file.type === 'folder' ? handleDragOver(e, file.id) : undefined}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => file.type === 'folder' ? handleDrop(e, file.id) : undefined}
+                             >
+                                 <div className="col-span-6 flex items-center gap-3 overflow-hidden">
+                                     <div className={visual.color}><Icon name={visual.icon} size={20} /></div>
+                                     <span className="truncate">{file.name}</span>
+                                 </div>
+                                 <div className="col-span-2 opacity-60 text-xs truncate">{file.mimeType || 'Folder'}</div>
+                                 <div className="col-span-2 opacity-60 text-xs font-mono">{file.type === 'folder' ? '--' : formatSize(file.size)}</div>
+                                 <div className="col-span-2 opacity-60 text-xs">{new Date(file.createdAt).toLocaleDateString()}</div>
+                             </div>
+                          );
+                      })}
+                  </div>
+              )}
+          </div>
+
+          {/* Status Bar */}
+          <div className="h-6 bg-surfaceVariant/30 border-t border-black/10 flex items-center px-4 text-xs opacity-60 gap-4 shrink-0">
+               <span>{files.length} item{files.length !== 1 && 's'}</span>
+               {files.length > 0 && <span>|</span>}
+               <span>{files.filter(f => f.type === 'folder').length} folders, {files.filter(f => f.type === 'file').length} files</span>
+          </div>
       </div>
+      
       <ContextMenu state={contextMenu} onClose={() => setContextMenu({ ...contextMenu, isOpen: false })} />
     </div>
   );
@@ -187,6 +345,7 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
   const [settings, setSettings] = useState<SystemSettings>(loadSettings());
   const [activeTab, setActiveTab] = useState('general');
   const [stats, setStats] = useState({ cpu: 0, ram: 0 });
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
 
   useEffect(() => {
       const interval = setInterval(() => {
@@ -197,6 +356,16 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
       }, 2000);
       return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+      if(settings.profilePicture === 'custom') {
+          getFile('sys_profile_pic').then(file => {
+              if (file && file.content) setProfilePicUrl(URL.createObjectURL(file.content));
+          });
+      } else {
+          setProfilePicUrl(null);
+      }
+  }, [settings.profilePicture]);
 
   const update = (s: Partial<SystemSettings>) => {
     const newSettings = { ...settings, ...s };
@@ -222,6 +391,24 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
       }
   };
 
+  const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          await saveFile({
+              id: 'sys_profile_pic',
+              parentId: 'system',
+              name: 'Profile Picture',
+              type: 'file',
+              mimeType: file.type,
+              content: file,
+              createdAt: Date.now(),
+              size: file.size
+          });
+          update({ profilePicture: 'custom' });
+          showNotification("Profile picture updated.");
+      }
+  };
+
   const handleRemoveWallpaper = async () => {
     try {
       await deleteFile('sys_wallpaper');
@@ -231,6 +418,17 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
       console.error(e);
       showNotification("Failed to remove wallpaper");
     }
+  };
+
+  const handleRemoveProfilePic = async () => {
+      try {
+          await deleteFile('sys_profile_pic');
+          update({ profilePicture: null });
+          showNotification("Profile picture removed.");
+      } catch (e) {
+          console.error(e);
+          showNotification("Failed to remove profile picture");
+      }
   };
 
   const handleFactoryReset = () => {
@@ -276,8 +474,18 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
                  <section>
                     <h2 className="text-sm font-bold opacity-50 uppercase mb-3">User Profile</h2>
                     <div className="bg-surfaceVariant/30 p-4 rounded-2xl flex items-center gap-4">
-                        <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-onPrimary text-2xl font-bold">
-                            {settings.userName.charAt(0).toUpperCase()}
+                        <div className="relative group cursor-pointer">
+                            {profilePicUrl ? (
+                                <img src={profilePicUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover shadow-md" />
+                            ) : (
+                                <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-onPrimary text-2xl font-bold">
+                                    {settings.userName.charAt(0).toUpperCase()}
+                                </div>
+                            )}
+                            <label className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Icon name="camera" className="text-white" size={24} />
+                                <input type="file" accept="image/*" className="hidden" onChange={handleProfilePicUpload} />
+                            </label>
                         </div>
                         <div className="flex-1">
                             <label className="text-xs opacity-50 block mb-1">Username</label>
@@ -288,6 +496,9 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
                                 className="w-full bg-transparent border-b border-black/20 focus:border-primary outline-none py-1 text-lg font-medium"
                             />
                         </div>
+                        {settings.profilePicture && (
+                            <button onClick={handleRemoveProfilePic} className="text-xs text-red-500 hover:bg-red-500/10 px-2 py-1 rounded">Remove Pic</button>
+                        )}
                     </div>
                  </section>
 
@@ -451,6 +662,15 @@ export const Settings: React.FC<AppProps> = ({ showNotification }) => {
                                 <Icon name="spark" size={12} />
                                 <span>Vibe coded using Gemini</span>
                             </div>
+                            <a 
+                                href="https://github.com/Abel-Ajish/Nextos" 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="flex items-center justify-center gap-1.5 text-xs opacity-60 hover:opacity-100 hover:text-primary transition-all mt-1 cursor-pointer"
+                            >
+                                <Icon name="code" size={12} />
+                                <span>Source Code</span>
+                            </a>
                          </div>
                      </div>
                  </div>
