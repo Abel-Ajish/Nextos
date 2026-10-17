@@ -23,6 +23,21 @@ export enum AppType {
   TaskManager = 'taskmanager'
 }
 
+export interface DesktopSpace {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type SnapState = 'left' | 'right' | null;
+
 export interface WindowState {
   id: string;
   appId: AppType;
@@ -35,6 +50,9 @@ export interface WindowState {
   isMaximized: boolean;
   zIndex: number;
   data?: any; // For opening specific files
+  desktopId?: string; // ID of the DesktopSpace it belongs to, or 'all' for all desktops
+  snapState?: SnapState;
+  prevBounds?: WindowBounds;
 }
 
 export interface FileSystemItem {
@@ -66,6 +84,11 @@ export interface AppProps {
   // New props for Task Manager
   runningApps: WindowState[];
   onCloseApp: (windowId: string) => void;
+  desktops?: DesktopSpace[];
+  activeDesktopId?: string;
+  onMoveWindowToDesktop?: (windowId: string, targetDesktopId: string) => void;
+  onSwitchDesktop?: (desktopId: string) => void;
+  onTileWindows?: () => void;
 }
 
 export interface ThemeColors {
@@ -84,6 +107,11 @@ export interface SystemSettings {
   clockFormat: '12h' | '24h';
   fontSize: 'small' | 'medium' | 'large';
   animations: boolean;
+  profilePicture: string | null;
+  glassEffect?: boolean;
+  glassBlur?: number; // Blur intensity in px (e.g. 0 to 40)
+  glassOpacity?: number; // Background opacity (e.g. 0.4 to 0.95)
+  bootSound?: boolean; // Play startup chime
 }
 
 export interface ContextMenuState {

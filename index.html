@@ -82,6 +82,20 @@
         .dark ::-webkit-scrollbar-thumb {
             background: rgba(255,255,255,0.2);
         }
+
+        /* Glassmorphism System Rules */
+        .window-glass {
+            backdrop-filter: blur(var(--window-glass-blur, 16px)) saturate(180%);
+            -webkit-backdrop-filter: blur(var(--window-glass-blur, 16px)) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+        }
+        .window-glass .bg-surface {
+            background-color: rgb(var(--color-surface) / var(--window-glass-opacity, 0.82)) !important;
+        }
+        .window-glass .window-content {
+            background-color: transparent !important;
+        }
     </style>
 <script type="importmap">
 {

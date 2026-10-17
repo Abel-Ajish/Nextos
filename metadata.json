@@ -1,8 +1,9 @@
 {
   "name": "NextOS",
-  "description": "A fully offline, browser-based operating system with Material You design, virtual file system, and window management.",
+  "description": "A fully offline, browser-based operating system with Material You design, virtual desktops, window tiling and snapping, virtual file system, and window management.",
   "requestFramePermissions": [
     "camera",
     "microphone"
-  ]
+  ],
+  "majorCapabilities": []
 }

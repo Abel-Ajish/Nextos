@@ -236,49 +236,119 @@ const TimerView = () => {
 };
 
 // --- Task Manager ---
-export const TaskManager: React.FC<AppProps> = ({ runningApps, onCloseApp, showNotification }) => {
-    
+export const TaskManager: React.FC<AppProps> = ({ 
+    runningApps, 
+    onCloseApp, 
+    showNotification,
+    desktops = [],
+    activeDesktopId = 'desktop-1',
+    onMoveWindowToDesktop,
+    onSwitchDesktop,
+    onTileWindows
+}) => {
     // Simulate resource usage
     const getRandomUsage = () => Math.floor(Math.random() * 20) + 1;
 
     return (
         <div className="h-full flex flex-col bg-surface">
             <div className="p-4 border-b border-black/10 flex justify-between items-center bg-surfaceVariant/20">
-                <h2 className="font-bold">Processes</h2>
-                <div className="text-xs opacity-50">{runningApps.length} active</div>
+                <div className="flex items-center gap-2">
+                    <h2 className="font-bold">Processes & Desktop Spaces</h2>
+                    <span className="text-xs opacity-50">({runningApps.length} active processes)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    {onTileWindows && (
+                        <button
+                            onClick={onTileWindows}
+                            className="px-2.5 py-1 bg-primary text-white rounded text-xs font-medium hover:bg-primary/90 transition-colors flex items-center gap-1 shadow-sm"
+                            title="Arrange all non-minimized windows into a grid layout (Alt + T)"
+                        >
+                            <span>Tile Windows</span>
+                        </button>
+                    )}
+                    {desktops.length > 0 && (
+                        <div className="text-xs text-primary font-medium hidden sm:block">
+                            {desktops.length} Virtual {desktops.length === 1 ? 'Desktop' : 'Desktops'}
+                        </div>
+                    )}
+                </div>
             </div>
             
             <div className="flex-1 overflow-auto">
                 <table className="w-full text-left text-sm border-collapse">
-                    <thead className="bg-surfaceVariant/50 sticky top-0">
+                    <thead className="bg-surfaceVariant/50 sticky top-0 text-xs">
                         <tr>
                             <th className="p-3 font-medium">Name</th>
+                            <th className="p-3 font-medium">Space</th>
                             <th className="p-3 font-medium">CPU</th>
                             <th className="p-3 font-medium">Memory</th>
                             <th className="p-3 font-medium text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {runningApps.map(app => (
-                            <tr key={app.id} className="border-b border-black/5 hover:bg-black/5">
-                                <td className="p-3 flex items-center gap-2">
-                                    <span className="font-medium">{app.title}</span>
-                                    <span className="text-xs opacity-50 font-mono">ID: {app.id.substring(0, 4)}</span>
-                                </td>
-                                <td className="p-3 font-mono">{getRandomUsage()}%</td>
-                                <td className="p-3 font-mono">{getRandomUsage() * 10 + 20} MB</td>
-                                <td className="p-3 text-right">
-                                    <button 
-                                        onClick={() => { onCloseApp(app.id); showNotification(`Terminated ${app.title}`); }}
-                                        className="px-3 py-1 bg-red-500/10 text-red-600 rounded hover:bg-red-500/20 text-xs font-medium"
-                                    >
-                                        End Task
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
+                        {runningApps.map(app => {
+                            const isPinnedAll = app.desktopId === 'all';
+                            const currentDesktop = desktops.find(d => d.id === (app.desktopId || activeDesktopId));
+
+                            return (
+                                <tr key={app.id} className="border-b border-black/5 hover:bg-black/5 transition-colors">
+                                    <td className="p-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-xs">{app.title}</span>
+                                            <span className="text-[10px] opacity-40 font-mono">#{app.id.slice(-4)}</span>
+                                        </div>
+                                    </td>
+                                    <td className="p-3">
+                                        {desktops.length > 0 && onMoveWindowToDesktop ? (
+                                            <select
+                                                value={isPinnedAll ? 'all' : (app.desktopId || activeDesktopId)}
+                                                onChange={(e) => {
+                                                    const target = e.target.value;
+                                                    onMoveWindowToDesktop(app.id, target);
+                                                    const targetName = target === 'all' ? 'All Desktops' : (desktops.find(d => d.id === target)?.name || 'target');
+                                                    showNotification(`Moved ${app.title} to ${targetName}`);
+                                                }}
+                                                className="text-xs bg-surface border border-black/10 rounded px-2 py-0.5 outline-none focus:ring-1 ring-primary"
+                                            >
+                                                {desktops.map(d => (
+                                                    <option key={d.id} value={d.id}>{d.name}</option>
+                                                ))}
+                                                <option value="all">All Desktops</option>
+                                            </select>
+                                        ) : (
+                                            <span className="text-xs opacity-70">
+                                                {isPinnedAll ? 'All Desktops' : (currentDesktop?.name || 'Desktop 1')}
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="p-3 font-mono text-xs">{getRandomUsage()}%</td>
+                                    <td className="p-3 font-mono text-xs">{getRandomUsage() * 10 + 20} MB</td>
+                                    <td className="p-3 text-right">
+                                        <div className="flex items-center justify-end gap-1.5">
+                                            {onSwitchDesktop && app.desktopId && app.desktopId !== 'all' && app.desktopId !== activeDesktopId && (
+                                                <button
+                                                    onClick={() => {
+                                                        onSwitchDesktop(app.desktopId!);
+                                                        showNotification(`Switched to ${desktops.find(d => d.id === app.desktopId)?.name || 'desktop'}`);
+                                                    }}
+                                                    className="px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20 text-xs font-medium"
+                                                >
+                                                    Switch to Space
+                                                </button>
+                                            )}
+                                            <button 
+                                                onClick={() => { onCloseApp(app.id); showNotification(`Terminated ${app.title}`); }}
+                                                className="px-2.5 py-1 bg-red-500/10 text-red-600 rounded hover:bg-red-500/20 text-xs font-medium transition-colors"
+                                            >
+                                                End Task
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                         {runningApps.length === 0 && (
-                            <tr><td colSpan={4} className="p-8 text-center opacity-50">No apps running</td></tr>
+                            <tr><td colSpan={5} className="p-8 text-center opacity-50">No apps running</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -287,6 +357,7 @@ export const TaskManager: React.FC<AppProps> = ({ runningApps, onCloseApp, showN
             <div className="p-2 border-t border-black/10 bg-surfaceVariant/10 text-xs flex gap-4 opacity-70">
                 <span>Total CPU: {Math.floor(Math.random() * 30) + 5}%</span>
                 <span>Total Memory: {Math.floor(Math.random() * 40) + 30}%</span>
+                <span>Active Spaces: {desktops.length || 1}</span>
             </div>
         </div>
     );

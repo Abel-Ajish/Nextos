@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AppDefinition, AppType, WindowState, ContextMenuState, NotificationItem } from './types';
-import { Icon, Taskbar, StartMenu, Window, ContextMenu, DesktopClock, DesktopCalendar, BootScreen, ToastNotification, LockScreen, CalendarWidget } from './components/SystemUI';
+import { AppDefinition, AppType, WindowState, ContextMenuState, NotificationItem, DesktopSpace } from './types';
+import { Icon, Taskbar, StartMenu, Window, ContextMenu, DesktopClock, DesktopCalendar, BootScreen, ToastNotification, LockScreen, CalendarWidget, TaskViewOverlay, DesktopSwitcherHUD, SnapGhostPreview } from './components/SystemUI';
 import { applyTheme, loadSettings, getFile } from './services/system';
 
 // Apps
@@ -58,6 +58,47 @@ const App: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ isOpen: false, x: 0, y: 0, items: [] });
   const [notification, setNotification] = useState<NotificationItem | null>(null);
   
+  // Virtual Desktops State
+  const [desktops, setDesktops] = useState<DesktopSpace[]>(() => {
+    const saved = localStorage.getItem('webos_virtual_desktops');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error("Failed to parse saved virtual desktops", e);
+      }
+    }
+    return [{ id: 'desktop-1', name: 'Desktop 1', createdAt: 1 }];
+  });
+
+  const [activeDesktopId, setActiveDesktopId] = useState<string>(() => {
+    const savedActive = localStorage.getItem('webos_active_desktop');
+    return savedActive || 'desktop-1';
+  });
+
+  const [isTaskViewOpen, setIsTaskViewOpen] = useState(false);
+  const [hudDesktopName, setHudDesktopName] = useState<string | null>(null);
+  const [hudWindowCount, setHudWindowCount] = useState<number | undefined>(undefined);
+  const [snapPreviewTarget, setSnapPreviewTarget] = useState<'left' | 'right' | 'top' | null>(null);
+  const hudTimerRef = useRef<any>(null);
+
+  // Sync virtual desktops to localStorage
+  useEffect(() => {
+    localStorage.setItem('webos_virtual_desktops', JSON.stringify(desktops));
+  }, [desktops]);
+
+  useEffect(() => {
+    localStorage.setItem('webos_active_desktop', activeDesktopId);
+  }, [activeDesktopId]);
+
+  // Ensure activeDesktopId is valid
+  useEffect(() => {
+    if (desktops.length > 0 && !desktops.some(d => d.id === activeDesktopId)) {
+      setActiveDesktopId(desktops[0].id);
+    }
+  }, [desktops, activeDesktopId]);
+
   // Desktop Apps Persistence
   const [desktopApps, setDesktopApps] = useState<AppType[]>(() => {
     const saved = localStorage.getItem('webos_desktop_apps');
@@ -103,7 +144,210 @@ const App: React.FC = () => {
       setTimeout(() => setNotification(curr => curr?.id === id ? null : curr), 3000);
   }, []);
 
-  const launchApp = useCallback((appId: AppType, data?: any) => {
+  const triggerDesktopHUD = useCallback((name: string, count?: number) => {
+    if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+    setHudDesktopName(name);
+    setHudWindowCount(count);
+    hudTimerRef.current = setTimeout(() => {
+      setHudDesktopName(null);
+    }, 1300);
+  }, []);
+
+  // Desktop Management Methods
+  const switchDesktop = useCallback((targetId: string) => {
+    const target = desktops.find(d => d.id === targetId);
+    if (!target) return;
+    setActiveDesktopId(targetId);
+    const winCount = windows.filter(w => (w.desktopId || activeDesktopId) === targetId || w.desktopId === 'all').length;
+    triggerDesktopHUD(target.name, winCount);
+  }, [desktops, windows, activeDesktopId, triggerDesktopHUD]);
+
+  const createDesktop = useCallback((customName?: string): string => {
+    const newId = `desktop-${Date.now()}`;
+    const name = customName || `Desktop ${desktops.length + 1}`;
+    const newSpace: DesktopSpace = {
+      id: newId,
+      name,
+      createdAt: Date.now()
+    };
+
+    setDesktops(prev => [...prev, newSpace]);
+    setActiveDesktopId(newId);
+    showNotification(`Created and switched to ${name}`);
+    triggerDesktopHUD(name, 0);
+    return newId;
+  }, [desktops.length, showNotification, triggerDesktopHUD]);
+
+  const removeDesktop = useCallback((targetId: string) => {
+    if (desktops.length <= 1) {
+      showNotification("Cannot remove the only virtual desktop");
+      return;
+    }
+
+    const targetIdx = desktops.findIndex(d => d.id === targetId);
+    if (targetIdx === -1) return;
+    const targetName = desktops[targetIdx].name;
+
+    // Pick fallback desktop
+    const fallbackIdx = targetIdx > 0 ? targetIdx - 1 : targetIdx + 1;
+    const fallbackSpace = desktops[fallbackIdx];
+
+    // Reassign all windows of the removed desktop to the fallback
+    setWindows(prev => prev.map(w => {
+      if ((w.desktopId || activeDesktopId) === targetId) {
+        return { ...w, desktopId: fallbackSpace.id };
+      }
+      return w;
+    }));
+
+    // Update desktops list
+    setDesktops(prev => prev.filter(d => d.id !== targetId));
+
+    // If active desktop was removed, switch to fallback
+    if (activeDesktopId === targetId) {
+      setActiveDesktopId(fallbackSpace.id);
+      triggerDesktopHUD(fallbackSpace.name);
+    }
+
+    showNotification(`Removed ${targetName}. Open windows moved to ${fallbackSpace.name}.`);
+  }, [desktops, activeDesktopId, showNotification, triggerDesktopHUD]);
+
+  const renameDesktop = useCallback((id: string, newName: string) => {
+    setDesktops(prev => prev.map(d => d.id === id ? { ...d, name: newName } : d));
+    showNotification(`Renamed to "${newName}"`);
+  }, [showNotification]);
+
+  const moveWindowToDesktop = useCallback((windowId: string, targetDesktopId: string) => {
+    const target = desktops.find(d => d.id === targetDesktopId);
+    setWindows(prev => prev.map(w => w.id === windowId ? { ...w, desktopId: targetDesktopId } : w));
+    if (target) {
+      showNotification(`Moved window to ${target.name}`);
+    }
+  }, [desktops, showNotification]);
+
+  const toggleWindowOnAllDesktops = useCallback((windowId: string) => {
+    setWindows(prev => prev.map(w => {
+      if (w.id === windowId) {
+        const isAll = w.desktopId === 'all';
+        const newDesktopId = isAll ? activeDesktopId : 'all';
+        showNotification(isAll ? "Window unpinned from all desktops" : "Window pinned to all desktops");
+        return { ...w, desktopId: newDesktopId };
+      }
+      return w;
+    }));
+  }, [activeDesktopId, showNotification]);
+
+  const createDesktopAndMove = useCallback((windowId: string) => {
+    const newId = `desktop-${Date.now()}`;
+    const name = `Desktop ${desktops.length + 1}`;
+    const newSpace: DesktopSpace = {
+      id: newId,
+      name,
+      createdAt: Date.now()
+    };
+
+    setDesktops(prev => [...prev, newSpace]);
+    setWindows(prev => prev.map(w => w.id === windowId ? { ...w, desktopId: newId } : w));
+    setActiveDesktopId(newId);
+    showNotification(`Created ${name} and moved window`);
+    triggerDesktopHUD(name, 1);
+  }, [desktops.length, showNotification, triggerDesktopHUD]);
+
+  // Tile all non-minimized windows on active desktop into a balanced grid
+  const tileWindows = useCallback(() => {
+    const currentDesktopWindows = windows.filter(win => 
+      (!win.desktopId || win.desktopId === 'all' || win.desktopId === activeDesktopId) && !win.isMinimized
+    );
+
+    if (currentDesktopWindows.length === 0) {
+      showNotification("No open windows to tile on this desktop");
+      return;
+    }
+
+    const count = currentDesktopWindows.length;
+    const taskbarHeight = 48;
+    const padding = 10;
+    const gap = 8;
+    const availableW = window.innerWidth - (padding * 2);
+    const availableH = window.innerHeight - taskbarHeight - (padding * 2);
+
+    const layout: { id: string; x: number; y: number; width: number; height: number }[] = [];
+
+    if (count === 1) {
+      layout.push({
+        id: currentDesktopWindows[0].id,
+        x: padding + Math.floor(availableW * 0.08),
+        y: padding + Math.floor(availableH * 0.04),
+        width: Math.floor(availableW * 0.84),
+        height: Math.floor(availableH * 0.92)
+      });
+    } else if (count === 2) {
+      const colW = Math.floor((availableW - gap) / 2);
+      layout.push({ id: currentDesktopWindows[0].id, x: padding, y: padding, width: colW, height: availableH });
+      layout.push({ id: currentDesktopWindows[1].id, x: padding + colW + gap, y: padding, width: colW, height: availableH });
+    } else if (count === 3) {
+      const colW = Math.floor((availableW - gap) / 2);
+      const rowH = Math.floor((availableH - gap) / 2);
+      layout.push({ id: currentDesktopWindows[0].id, x: padding, y: padding, width: colW, height: availableH });
+      layout.push({ id: currentDesktopWindows[1].id, x: padding + colW + gap, y: padding, width: colW, height: rowH });
+      layout.push({ id: currentDesktopWindows[2].id, x: padding + colW + gap, y: padding + rowH + gap, width: colW, height: availableH - rowH - gap });
+    } else if (count === 4) {
+      const colW = Math.floor((availableW - gap) / 2);
+      const rowH = Math.floor((availableH - gap) / 2);
+      layout.push({ id: currentDesktopWindows[0].id, x: padding, y: padding, width: colW, height: rowH });
+      layout.push({ id: currentDesktopWindows[1].id, x: padding + colW + gap, y: padding, width: colW, height: rowH });
+      layout.push({ id: currentDesktopWindows[2].id, x: padding, y: padding + rowH + gap, width: colW, height: rowH });
+      layout.push({ id: currentDesktopWindows[3].id, x: padding + colW + gap, y: padding + rowH + gap, width: colW, height: rowH });
+    } else {
+      const cols = Math.ceil(Math.sqrt(count));
+      const rows = Math.ceil(count / cols);
+      const colW = Math.floor((availableW - (cols - 1) * gap) / cols);
+      const rowH = Math.floor((availableH - (rows - 1) * gap) / rows);
+
+      currentDesktopWindows.forEach((win, index) => {
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        const itemsInThisRow = (row === rows - 1) ? (count - row * cols) : cols;
+        let currentX = padding + col * (colW + gap);
+        let currentW = colW;
+
+        if (itemsInThisRow < cols && row === rows - 1) {
+          const expandedW = Math.floor((availableW - (itemsInThisRow - 1) * gap) / itemsInThisRow);
+          currentX = padding + col * (expandedW + gap);
+          currentW = expandedW;
+        }
+
+        layout.push({
+          id: win.id,
+          x: currentX,
+          y: padding + row * (rowH + gap),
+          width: currentW,
+          height: rowH
+        });
+      });
+    }
+
+    setWindows(prev => prev.map(w => {
+      const item = layout.find(l => l.id === w.id);
+      if (item) {
+        return {
+          ...w,
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+          isMaximized: false,
+          snapState: null,
+          prevBounds: (w.snapState || w.isMaximized) ? w.prevBounds : { x: w.x, y: w.y, width: w.width, height: w.height }
+        };
+      }
+      return w;
+    }));
+
+    showNotification(`Tiled ${count} windows in grid layout`);
+  }, [windows, activeDesktopId, showNotification]);
+
+  const launchApp = useCallback((appId: AppType, data?: any, targetDesktopId?: string) => {
     const appDef = APPS.find(a => a.id === appId);
     if (!appDef) return;
 
@@ -119,7 +363,8 @@ const App: React.FC = () => {
       isMinimized: false,
       isMaximized: false,
       zIndex: nextZIndex,
-      data
+      data,
+      desktopId: targetDesktopId || activeDesktopId
     };
 
     setWindows(prev => [...prev, newWindow]);
@@ -127,7 +372,7 @@ const App: React.FC = () => {
     setActiveWindowId(id);
     setStartOpen(false);
     setCalendarOpen(false);
-  }, [nextZIndex, windows.length]);
+  }, [nextZIndex, windows.length, activeDesktopId]);
 
   const closeWindow = (id: string) => {
     setWindows(prev => prev.filter(w => w.id !== id));
@@ -136,7 +381,7 @@ const App: React.FC = () => {
 
   const focusWindow = (id: string) => {
     setActiveWindowId(id);
-    setWindows(prev => prev.map(w => w.id === id ? { ...w, zIndex: nextZIndex } : w));
+    setWindows(prev => prev.map(w => w.id === id ? { ...w, zIndex: nextZIndex, isMinimized: false } : w));
     setNextZIndex(prev => prev + 1);
   };
 
@@ -149,8 +394,98 @@ const App: React.FC = () => {
   };
   
   const toggleMaximize = (id: string) => {
-    setWindows(prev => prev.map(w => w.id === id ? { ...w, isMaximized: !w.isMaximized } : w));
+    setWindows(prev => prev.map(w => {
+      if (w.id === id) {
+        if (w.isMaximized) {
+          return {
+            ...w,
+            isMaximized: false,
+            snapState: null,
+            ...(w.prevBounds || { x: 50, y: 50, width: 600, height: 450 })
+          };
+        } else {
+          const prev = (w.snapState || w.isMaximized)
+            ? w.prevBounds
+            : { x: w.x, y: w.y, width: w.width, height: w.height };
+          return {
+            ...w,
+            isMaximized: true,
+            snapState: null,
+            prevBounds: prev
+          };
+        }
+      }
+      return w;
+    }));
   };
+
+  // Global Keyboard Shortcuts for Virtual Desktops
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in form controls
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      // Alt + D: Toggle Task View / Virtual Desktop overview
+      if (e.altKey && !e.shiftKey && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        setIsTaskViewOpen(prev => !prev);
+        return;
+      }
+
+      // Alt + T: Tile Windows in Grid
+      if (e.altKey && !e.shiftKey && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        tileWindows();
+        return;
+      }
+
+      // Alt + Shift + D: Create new desktop space
+      if (e.altKey && e.shiftKey && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        createDesktop();
+        return;
+      }
+
+      // Alt + LeftArrow: Previous desktop
+      if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const curIdx = desktops.findIndex(d => d.id === activeDesktopId);
+        if (curIdx > 0) {
+          switchDesktop(desktops[curIdx - 1].id);
+        } else if (desktops.length > 1) {
+          switchDesktop(desktops[desktops.length - 1].id);
+        }
+        return;
+      }
+
+      // Alt + RightArrow: Next desktop
+      if (e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault();
+        const curIdx = desktops.findIndex(d => d.id === activeDesktopId);
+        if (curIdx < desktops.length - 1) {
+          switchDesktop(desktops[curIdx + 1].id);
+        } else if (desktops.length > 1) {
+          switchDesktop(desktops[0].id);
+        }
+        return;
+      }
+
+      // Alt + 1..9: Jump directly to desktop space
+      if (e.altKey && !e.shiftKey && e.key >= '1' && e.key <= '9') {
+        const num = parseInt(e.key, 10);
+        if (num <= desktops.length) {
+          e.preventDefault();
+          switchDesktop(desktops[num - 1].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [desktops, activeDesktopId, switchDesktop, createDesktop, tileWindows]);
 
   const handleDesktopClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -162,16 +497,26 @@ const App: React.FC = () => {
 
   const handleDesktopContextMenu = (e: React.MouseEvent) => {
       e.preventDefault();
+      
+      const desktopItems = [
+          { label: '🪟 Task View (Desktops)', action: () => setIsTaskViewOpen(true) },
+          { label: '⊞ Tile Windows (Alt + T)', action: tileWindows },
+          { label: '➕ New Desktop Space', action: () => createDesktop() },
+          ...desktops.map((d) => ({
+              label: `${d.id === activeDesktopId ? '✓ ' : '   '}${d.name}`,
+              action: () => switchDesktop(d.id)
+          })),
+          { label: 'Refresh Wallpaper', action: loadWallpaper },
+          { label: 'Settings', action: () => launchApp(AppType.Settings) },
+          { label: 'New Text File', action: () => launchApp(AppType.Notes) },
+          { label: 'Lock Screen', action: () => { setLocked(true); setStartOpen(false); setCalendarOpen(false); } }
+      ];
+
       setContextMenu({
           isOpen: true,
           x: e.clientX,
           y: e.clientY,
-          items: [
-              { label: 'Refresh Wallpaper', action: loadWallpaper },
-              { label: 'Settings', action: () => launchApp(AppType.Settings) },
-              { label: 'New Text File', action: () => launchApp(AppType.Notes) },
-              { label: 'Lock Screen', action: () => { setLocked(true); setStartOpen(false); setCalendarOpen(false); } }
-          ]
+          items: desktopItems
       });
   };
 
@@ -268,32 +613,53 @@ const App: React.FC = () => {
         })}
       </div>
 
-      {/* Windows Layer */}
-      {windows.map(win => {
-        const AppComp = APPS.find(a => a.id === win.appId)?.component;
-        return (
-          <Window 
-            key={win.id}
-            windowState={win}
-            isActive={activeWindowId === win.id}
-            onClose={closeWindow}
-            onFocus={focusWindow}
-            onMinimize={toggleMinimize}
-            onMaximize={toggleMaximize}
-            onUpdate={updateWindow}
-          >
-            {AppComp && (
-                <AppComp 
-                    windowId={win.id} 
-                    data={win.data} 
-                    onLaunchApp={launchApp} 
-                    showNotification={showNotification}
-                    runningApps={windows}
-                    onCloseApp={closeWindow}
-                />
-            )}
-          </Window>
-        );
+      {/* Desktop Switcher Floating HUD */}
+      <DesktopSwitcherHUD desktopName={hudDesktopName} windowCount={hudWindowCount} />
+
+      {/* Snap Ghost Preview Overlay for edge dragging */}
+      <SnapGhostPreview snapTarget={snapPreviewTarget} />
+
+      {/* Windows Layer (Filtered to active desktop and 'all') */}
+      {windows
+        .filter(win => !win.desktopId || win.desktopId === 'all' || win.desktopId === activeDesktopId)
+        .map(win => {
+          const AppComp = APPS.find(a => a.id === win.appId)?.component;
+          return (
+            <Window 
+              key={win.id}
+              windowState={win}
+              isActive={activeWindowId === win.id}
+              onClose={closeWindow}
+              onFocus={focusWindow}
+              onMinimize={toggleMinimize}
+              onMaximize={toggleMaximize}
+              onUpdate={updateWindow}
+              onSnapPreview={setSnapPreviewTarget}
+              showNotification={showNotification}
+              desktops={desktops}
+              activeDesktopId={activeDesktopId}
+              onMoveToDesktop={moveWindowToDesktop}
+              onToggleAllDesktops={toggleWindowOnAllDesktops}
+              onCreateDesktopAndMove={createDesktopAndMove}
+              onTileWindows={tileWindows}
+            >
+              {AppComp && (
+                  <AppComp 
+                      windowId={win.id} 
+                      data={win.data} 
+                      onLaunchApp={launchApp} 
+                      showNotification={showNotification}
+                      runningApps={windows}
+                      onCloseApp={closeWindow}
+                      desktops={desktops}
+                      activeDesktopId={activeDesktopId}
+                      onMoveWindowToDesktop={moveWindowToDesktop}
+                      onSwitchDesktop={switchDesktop}
+                      onTileWindows={tileWindows}
+                  />
+              )}
+            </Window>
+          );
       })}
 
       <StartMenu 
@@ -309,19 +675,56 @@ const App: React.FC = () => {
         onClose={() => setCalendarOpen(false)}
       />
 
+      {/* Virtual Desktop Task View / Mission Control Overlay */}
+      <TaskViewOverlay 
+        isOpen={isTaskViewOpen}
+        onClose={() => setIsTaskViewOpen(false)}
+        desktops={desktops}
+        activeDesktopId={activeDesktopId}
+        onSwitchDesktop={switchDesktop}
+        onCreateDesktop={createDesktop}
+        onRemoveDesktop={removeDesktop}
+        onRenameDesktop={renameDesktop}
+        windows={windows}
+        apps={APPS}
+        onFocusWindow={focusWindow}
+        onCloseWindow={closeWindow}
+        onMoveWindowToDesktop={moveWindowToDesktop}
+        onToggleAllDesktops={toggleWindowOnAllDesktops}
+        onTileWindows={tileWindows}
+      />
+
       {/* Taskbar Container with Slide Animation */}
       <div className={`fixed bottom-0 left-0 right-0 z-[1000] transition-transform duration-500 ${locked ? 'translate-y-full' : 'translate-y-0'}`}>
         <Taskbar 
             apps={APPS}
-            runningApps={windows}
+            runningApps={windows.filter(win => !win.desktopId || win.desktopId === 'all' || win.desktopId === activeDesktopId)}
+            allWindows={windows}
+            desktops={desktops}
+            activeDesktopId={activeDesktopId}
+            onSwitchDesktop={switchDesktop}
+            onCreateDesktop={createDesktop}
+            onToggleTaskView={() => setIsTaskViewOpen(prev => !prev)}
+            isTaskViewOpen={isTaskViewOpen}
+            onTileWindows={tileWindows}
             onLaunch={(id) => {
-                const running = windows.find(w => w.appId === id);
-                if (running) {
-                    if (running.isMinimized) toggleMinimize(running.id);
-                    focusWindow(running.id);
-                } else {
-                    launchApp(id);
+                const currentDesktopWindows = windows.filter(win => !win.desktopId || win.desktopId === 'all' || win.desktopId === activeDesktopId);
+                const runningInCurrent = currentDesktopWindows.find(w => w.appId === id);
+                if (runningInCurrent) {
+                    if (runningInCurrent.isMinimized) toggleMinimize(runningInCurrent.id);
+                    focusWindow(runningInCurrent.id);
+                    return;
                 }
+                const runningOther = windows.find(w => w.appId === id);
+                if (runningOther) {
+                    if (runningOther.desktopId && runningOther.desktopId !== 'all') {
+                        switchDesktop(runningOther.desktopId);
+                    }
+                    if (runningOther.isMinimized) toggleMinimize(runningOther.id);
+                    focusWindow(runningOther.id);
+                    return;
+                }
+                launchApp(id);
             }}
             onToggleStart={() => {
                 setStartOpen(!startOpen);

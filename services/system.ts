@@ -191,6 +191,11 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   clockFormat: '24h',
   fontSize: 'medium',
   animations: true,
+  profilePicture: null,
+  glassEffect: true,
+  glassBlur: 16,
+  glassOpacity: 0.82,
+  bootSound: true
 };
 
 export const loadSettings = (): SystemSettings => {
@@ -228,6 +233,15 @@ export const applyTheme = (settings: SystemSettings) => {
   const sizeMap = { small: '14px', medium: '16px', large: '18px' };
   root.style.fontSize = sizeMap[settings.fontSize] || '16px';
 
+  // Window Glass-morphism
+  const isGlass = settings.glassEffect !== false;
+  const blurPx = settings.glassBlur ?? 16;
+  const opacity = settings.glassOpacity ?? 0.82;
+
+  root.style.setProperty('--window-glass-enabled', isGlass ? '1' : '0');
+  root.style.setProperty('--window-glass-blur', `${blurPx}px`);
+  root.style.setProperty('--window-glass-opacity', `${opacity}`);
+
   // Colors
   const rgb = hexToRgb(settings.themeColor);
   if (rgb) {
@@ -254,6 +268,84 @@ export const applyTheme = (settings: SystemSettings) => {
         setVar('--color-on-surface', 28, 27, 31);
         setVar('--color-secondary', r * 0.9, g * 0.9, b * 0.9);
     }
+  }
+};
+
+// --- Audio Synthesis Engine (Offline Web Audio API) ---
+let audioCtx: AudioContext | null = null;
+
+const getAudioContext = (): AudioContext | null => {
+  if (typeof window === 'undefined') return null;
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!audioCtx || audioCtx.state === 'closed') {
+    audioCtx = new AudioContextClass();
+  }
+  return audioCtx;
+};
+
+/**
+ * Synthesizes a lush, modern harmonic OS startup chime.
+ * Major 9th chord arpeggio into warm shimmering chord pad.
+ */
+export const playBootSound = async (): Promise<boolean> => {
+  const ctx = getAudioContext();
+  if (!ctx) return false;
+
+  try {
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+
+    const now = ctx.currentTime;
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.35, now);
+    masterGain.connect(ctx.destination);
+
+    // Warm Lowpass Filter
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(3200, now);
+    filter.frequency.exponentialRampToValueAtTime(1400, now + 2.5);
+    filter.connect(masterGain);
+
+    // Chime notes: C3 root base, then ascending chord F3, C4, E4, A4, C5, E5, G5
+    const notes = [
+      { freq: 130.81, timeOffset: 0.0, duration: 2.8, type: 'sine' as OscillatorType, gain: 0.4 },
+      { freq: 174.61, timeOffset: 0.05, duration: 2.7, type: 'triangle' as OscillatorType, gain: 0.3 },
+      { freq: 261.63, timeOffset: 0.12, duration: 2.6, type: 'sine' as OscillatorType, gain: 0.35 },
+      { freq: 329.63, timeOffset: 0.20, duration: 2.5, type: 'triangle' as OscillatorType, gain: 0.3 },
+      { freq: 440.00, timeOffset: 0.28, duration: 2.4, type: 'sine' as OscillatorType, gain: 0.35 },
+      { freq: 523.25, timeOffset: 0.36, duration: 2.4, type: 'sine' as OscillatorType, gain: 0.3 },
+      { freq: 659.25, timeOffset: 0.44, duration: 2.3, type: 'sine' as OscillatorType, gain: 0.25 },
+      { freq: 783.99, timeOffset: 0.52, duration: 2.2, type: 'sine' as OscillatorType, gain: 0.2 }
+    ];
+
+    notes.forEach(({ freq, timeOffset, duration, type, gain: noteGain }) => {
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now + timeOffset);
+
+      // Soft attack & exponential decay envelope
+      const startTime = now + timeOffset;
+      gainNode.gain.setValueAtTime(0.0001, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(noteGain, startTime + 0.06);
+      gainNode.gain.exponentialRampToValueAtTime(noteGain * 0.5, startTime + 0.6);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+      osc.connect(gainNode);
+      gainNode.connect(filter);
+
+      osc.start(startTime);
+      osc.stop(startTime + duration + 0.1);
+    });
+
+    return true;
+  } catch (err) {
+    console.warn("Could not play startup sound automatically:", err);
+    return false;
   }
 };
 
